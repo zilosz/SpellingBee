@@ -1,8 +1,10 @@
 <script lang="ts">
 	import ProgressTracker from "$lib/ProgressTracker.svelte";
     import WordBuilder from "$lib/WordBuilder.svelte";
-	import { loadPangram } from "$lib/utils/pangram-utils";
 	import Notifications from "svelte-notifications";
+    import type { PageData } from "./$types";
+
+    export let data: PageData;
 </script>
 
 <svelte:head>
@@ -13,7 +15,7 @@
     <div class="panel-wrapper">
         <div class="wrapper">
             <div class="word-builder">
-                <WordBuilder pangram={loadPangram()} />
+                <WordBuilder pangram={data.pangram} />
             </div>
         </div>
         <div class="wrapper">

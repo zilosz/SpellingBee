@@ -1,48 +1,48 @@
 import type { Words } from "$lib/types/words.type";
-import { isPangram, scoreLetters } from "$lib/utils/pangram-utils";
+import { isPangram, computeWordScore } from "$lib/utils/pangram-utils";
 import { writable } from "svelte/store";
 
-function updateFoundWords(foundWords: Words, word: string): Words {
+function updateFoundWords(foundWords: Words, word: string, pangramLength: number): Words {
     const newWords = foundWords.wordSet;
     newWords.add(word);
 
-    const newMap = foundWords.lengthToFrequencyMap;
-    const frequency = newMap.get(word.length);
+    const newLengthFrequencies = foundWords.lengthFrequencies;
+    const frequency = newLengthFrequencies.get(word.length);
 
     if (frequency === undefined) {
-        newMap.set(word.length, 1);
+        newLengthFrequencies.set(word.length, 1);
 
     } else {
-        newMap.set(word.length, frequency + 1);
+        newLengthFrequencies.set(word.length, frequency + 1);
     }
 
     let numPangrams = foundWords.numPangrams;
 
-    if (isPangram(word)) {
+    if (isPangram(word, pangramLength)) {
         numPangrams++;
     }
 
     return {
         wordSet: newWords, 
-        lengthToFrequencyMap: newMap, 
+        lengthFrequencies: newLengthFrequencies, 
         numPangrams: numPangrams, 
-        numPoints: foundWords.numPoints + scoreLetters(word)
+        numPoints: foundWords.numPoints + computeWordScore(word, pangramLength)
     }
 }
 
-function createFoundWordsStore(wordsFound: Words) {
-    const { subscribe, update } = writable(wordsFound)
+function createFoundWordsStore(words: Words) {
+    const { subscribe, update } = writable(words)
 
-    function addWord(word: string) {
-        update(wordsFound => updateFoundWords(wordsFound, word));
+    function addWord(word: string, pangramLength: number) {
+        update(words => updateFoundWords(words, word, pangramLength));
     }
 
-    return { subscribe, addWord }
+    return { subscribe, addWord };
 }
 
 export const foundWords = createFoundWordsStore({
     wordSet: new Set(), 
-    lengthToFrequencyMap: new Map(), 
+    lengthFrequencies: new Map(), 
     numPangrams: 0, 
     numPoints: 0
 })

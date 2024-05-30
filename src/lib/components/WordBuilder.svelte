@@ -1,36 +1,29 @@
 <script lang="ts">
 	import LetterButton from './LetterButton.svelte';
 	import reloadSymbol from '$lib/assets/reload-symbol.png';
-	import { currentWord } from './stores/current-word-store';
-	import { foundWords } from './stores/words-found-store';
-	import { scoreLetters, shufflePangram } from './utils/pangram-utils';
 	import { getNotificationsContext } from 'svelte-notifications';
-	import { possibleWords } from './stores/possible-words-store';
+	import type { Pangram } from '$lib/types/pangram.type';
+	import { possibleWords } from '$lib/stores/possible-words-store';
+	import { currentWord } from '$lib/stores/current-word-store';
+	import { foundWords } from '$lib/stores/words-found-store';
+	import { computeWordScore } from '$lib/utils/pangram-utils';
+	import { settings } from '$lib/stores/settings-store';
+	import { shuffledMap } from '$lib/utils/math-utils';
 
 	const { addNotification, clearNotifications } = getNotificationsContext();
 
-	export let pangram: string[];
+	export let pangram: Pangram;
 
-	const mandatoryLetter = pangram[3];
-	possibleWords.init(pangram, mandatoryLetter);
+	possibleWords.init(pangram);
 
 	function shuffleLetters() {
-		pangram = shufflePangram(pangram);
+		pangram.letters = shuffledMap(pangram.letters);
 	}
 
 	function submitWord() {
 		clearNotifications();
 
-		if (!$currentWord.includes(mandatoryLetter)) {
-
-			addNotification({
-				type: "error", 
-				text: `Missing center letter...`, 
-				position: "top-center", 
-				removeAfter: 1_500
-			});
-
-		} else if (!$possibleWords.wordSet.has($currentWord)) {
+		if (!$possibleWords.wordSet.has($currentWord)) {
 
 			addNotification({
 				type: "error", 
@@ -49,14 +42,36 @@
 			});
 
 		} else {
-			foundWords.addWord($currentWord);
+			let hasMandatoryLetters = true;
 
-			addNotification({
-				type: "success", 
-				text: `${$currentWord.toUpperCase()}: +${scoreLetters($currentWord)} points!`, 
-				position: "top-center", 
-				removeAfter: 1_500
-			})
+			for (const [letter, mandatory] of pangram.letters) {
+
+				if (mandatory && !$currentWord.includes(letter)) {
+					hasMandatoryLetters = false;
+					break;
+				}
+			}
+
+			if (hasMandatoryLetters) {
+				foundWords.addWord($currentWord, $settings.pangramLength);
+
+				const score = computeWordScore($currentWord, $settings.pangramLength);
+
+				addNotification({
+					type: "success", 
+					text: `${$currentWord.toUpperCase()}: +${score} points!`, 
+					position: "top-center", 
+					removeAfter: 1_500
+				})
+
+			} else {
+				addNotification({
+					type: "error", 
+					text: `Missing center letter...`, 
+					position: "top-center", 
+					removeAfter: 1_500
+				});
+			}
 		}
 
 		currentWord.clear();
@@ -87,12 +102,12 @@
 
 <h2>
 	{#each $currentWord as letter}
-		<span class:mandatory={letter === mandatoryLetter}>{letter}</span>
+		<span class:mandatory={pangram.letters.get(letter)}>{letter}</span>
 	{/each}
 </h2>
 <div class="letters">
-	{#each pangram as letter}
-		<LetterButton {letter} mandatory={letter === mandatoryLetter} />
+	{#each pangram.letters as [letter, mandatory]}
+		<LetterButton letter={letter} mandatory={mandatory} />
 	{/each}
 </div>
 <div class="buttons">
@@ -172,7 +187,7 @@
 		font-family:
 			Gill Sans,
 			sans-serif;
-		font-size: 56px;
+		font-size: 45px;
 		color: white;
 		margin-bottom: 20px;
 		height: 70px;

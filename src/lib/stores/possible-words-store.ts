@@ -1,18 +1,28 @@
+import { WORDS } from "$lib/constants/words";
+import type { Pangram } from "$lib/types/pangram.type";
 import type { Words } from "$lib/types/words.type";
-import { isPangram, scoreLetters } from "$lib/utils/pangram-utils";
-import { words } from "$lib/data/words";
+import { isPangram, computeWordScore } from "$lib/utils/pangram-utils";
 import { writable } from "svelte/store";
 
-function findPossibleWords(letters: string[], mandatoryLetter: string): Words {
+function findPossibleWords(pangram: Pangram): Words {
     const wordSet: Set<string> = new Set();
-    const lengthToFrequencyMap = new Map();
+    const lengthFrequencies: Map<number, number> = new Map();
 
     let numPangrams = 0;
     let numPoints = 0;
 
-    for (const word of words) {
+    for (const word of WORDS) {
+        let missingMandatory = false;
 
-        if (!word.includes(mandatoryLetter)) {
+        for (const [letter, mandatory] of pangram.letters) {
+
+            if (mandatory && !word.includes(letter)) {
+                missingMandatory = true;
+                break;
+            }
+        }
+
+        if (missingMandatory) {
             continue;
         }
 
@@ -20,7 +30,7 @@ function findPossibleWords(letters: string[], mandatoryLetter: string): Words {
 
         for (const possibleLetter of word) {
 
-            if (!letters.includes(possibleLetter)) {
+            if (!pangram.letters.has(possibleLetter)) {
                 possible = false;
                 break;
             }
@@ -29,35 +39,35 @@ function findPossibleWords(letters: string[], mandatoryLetter: string): Words {
         if (possible) {
             wordSet.add(word);
 
-            const frequency = lengthToFrequencyMap.get(word.length);
+            const frequency = lengthFrequencies.get(word.length);
 
             if (frequency === undefined) {
-                lengthToFrequencyMap.set(word.length, 1);
+                lengthFrequencies.set(word.length, 1);
 
             } else {
-                lengthToFrequencyMap.set(word.length, frequency + 1);
+                lengthFrequencies.set(word.length, frequency + 1);
             }
 
-            if (isPangram(word)) {
+            if (isPangram(word, pangram.letters.size)) {
                 numPangrams++;
             }
 
-            numPoints += scoreLetters(word);
+            numPoints += computeWordScore(word, pangram.letters.size);
         }
     }
 
-    const sortedLengthToFrequencyMap = new Map();
+    const sortedLengthFrequencies = new Map();
 
-    const lengthKeys = [...lengthToFrequencyMap.keys()];
+    const lengthKeys = [...lengthFrequencies.keys()];
     lengthKeys.sort((a, b) => a - b);
 
     for (const length of lengthKeys) {
-        sortedLengthToFrequencyMap.set(length, lengthToFrequencyMap.get(length));
+        sortedLengthFrequencies.set(length, lengthFrequencies.get(length));
     }
 
     return {
         wordSet: wordSet, 
-        lengthToFrequencyMap: sortedLengthToFrequencyMap, 
+        lengthFrequencies: sortedLengthFrequencies, 
         numPangrams: numPangrams, 
         numPoints: numPoints
     }
@@ -66,8 +76,8 @@ function findPossibleWords(letters: string[], mandatoryLetter: string): Words {
 function createPossibleWordsStore(words: Words) {
     const { subscribe, set } = writable(words);
 
-    function init(letters: string[], mandatoryLetter: string) {
-        set(findPossibleWords(letters, mandatoryLetter));
+    function init(pangram: Pangram) {
+        set(findPossibleWords(pangram));
     }
 
     return { subscribe, init };
@@ -75,7 +85,7 @@ function createPossibleWordsStore(words: Words) {
 
 export const possibleWords = createPossibleWordsStore({
     wordSet: new Set(), 
-    lengthToFrequencyMap: new Map(), 
+    lengthFrequencies: new Map(), 
     numPangrams: 0, 
     numPoints: 0
 });
